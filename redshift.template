@@ -1,0 +1,254 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Provision Redshift Cluster",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [ {
+          "Label": {
+            "default": "Redshift Cluster Specifications"
+          },
+		  "Parameters": [
+            "ClusterType",
+            "NumberOfNodes",
+            "NodeType",
+            "DatabaseName",
+			"MasterUsername",
+			"MasterUserPassword",
+			"PortNumber",
+			"RedshiftEncryptKey"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Redshift Environmental Specifications"
+          },
+          "Parameters": [
+            "Environment",
+            "BillingCode",
+            "Owner",
+            "Role"
+          ]
+        }
+      ]
+    }
+  },
+  "Parameters": {
+    "Environment": {
+      "Description": "Enter environment name",
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "prod"],
+      "ConstraintDescription":"Enter only allowed values.",
+      "MinLength":"1"
+    },
+    "BillingCode": {
+      "Description": "Enter BillingCode",
+      "Type": "String",
+      "Default": "atom",
+      "ConstraintDescription":"Enter BillingCode",
+      "MinLength":"1"
+    },
+    "Owner": {
+      "Description": "Enter owner name",
+      "Type": "String",
+      "ConstraintDescription":"Enter owner name proper.",
+      "MinLength":"1"
+    },
+    "Role": {
+      "Description": "Enter Role name",
+      "Type": "String",
+      "ConstraintDescription":"Enter role of cluster",
+      "MinLength":"1"
+    },
+    "DatabaseName" : {
+      "Description" : "The name of the first database to be created when the cluster is created",
+      "Type" : "String",
+      "Default" : "dev",
+      "AllowedPattern" : "([a-z]|[0-9])+"
+    },
+    "ClusterType" : {
+      "Description" : "The type of cluster",
+      "Type" : "String",
+      "Default" : "single-node",
+      "AllowedValues" : [ "single-node", "multi-node" ]
+    },
+    "NumberOfNodes" : {
+      "Description" : "The number of compute nodes in the cluster. For multi-node clusters, the NumberOfNodes parameter must be greater than 1",
+      "Type" : "Number",
+      "Default" : "1"
+    },
+    "NodeType" : {
+      "Description" : "The type of node to be provisioned",
+      "Type" : "String",
+      "Default" : "dc2.large",
+      "AllowedValues" : [ "ds2.xlarge", "ds2.8xlarge", "dc2.large", "dc2.8xlarge" ]
+    }, 
+    "MasterUsername" : {
+      "Description" : "The user name that is associated with the master user account for the cluster that is being created",
+      "Type" : "String",
+      "Default" : "defaultuser",
+      "AllowedPattern" : "([a-z])([a-z]|[0-9])*"
+    },
+    "MasterUserPassword" :  {
+      "Description" : "The password that is associated with the master user account for the cluster that is being created.",
+      "Type" : "String",
+      "NoEcho" : "true"
+    },
+    "PortNumber" : {
+      "Description" : "The port number on which the cluster accepts incoming connections.",
+      "Type" : "Number",
+      "Default" : "5439"
+    },
+	"RedshiftEncryptKey" : {
+      "Description" : "The Encryption Key which encrypts cluster data at rest.",
+      "Type" : "String",
+      "Default" : "arn:aws:kms:ap-south-1:039561965667:key/<id>"
+    }
+  },
+  "Mappings":{
+    "SubnetsForGroup":{
+      "prod" : {"subnet1":"subnet-46ffc32f", "subnet2":"subnet-931b6ede"},
+      "dev" : {"subnet1":"subnet-f7b89a9e", "subnet2":"subnet-bef16bf3"},
+  	  "vpc" : {"dev":"vpc-51550538", "prod":"vpc-d81548b1"}
+  	}
+  },
+  "Conditions": {
+    "IsMultiNodeCluster" : {
+      "Fn::Equals" : [{ "Ref" : "ClusterType" }, "multi-node" ]        
+    }
+  },
+  "Resources" : {
+    "RedshiftCluster" : {
+      "Type" : "AWS::Redshift::Cluster",
+      "Properties" : {
+        "ClusterType" : { "Ref" : "ClusterType" },
+        "NumberOfNodes" : { "Fn::If" : [ "IsMultiNodeCluster",  { "Ref" : "NumberOfNodes" }, { "Ref" : "AWS::NoValue" }]},
+        "NodeType" : { "Ref" : "NodeType" },
+        "DBName" : { "Ref" : "DatabaseName" },
+        "MasterUsername" : { "Ref" : "MasterUsername" },
+        "MasterUserPassword" : { "Ref" : "MasterUserPassword" },               
+        "ClusterParameterGroupName" : { "Ref" : "RedshiftClusterParameterGroup" },
+        "VpcSecurityGroupIds" : [ { "Ref" : "SecurityGroup" } ],
+        "ClusterSubnetGroupName" : { "Ref" : "RedshiftClusterSubnetGroup" },
+        "PubliclyAccessible" : "false",
+		"Encrypted" : "true",
+		"KmsKeyId" : { "Ref" : "RedshiftEncryptKey" },
+        "Port" : { "Ref" : "PortNumber" },
+        "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"},"-redshift-", { "Ref": "Role"}] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Ref":"Role" }
+          } 
+		]
+      }
+    },
+    "RedshiftClusterParameterGroup" : {
+      "Type" : "AWS::Redshift::ClusterParameterGroup",
+      "Properties" : {
+        "Description" : "Cluster parameter group",
+        "ParameterGroupFamily" : "redshift-1.0",
+        "Parameters" : [{
+          "ParameterName" : "enable_user_activity_logging",
+          "ParameterValue" : "true"
+        }],
+  	    "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"},"-redshift-", { "Ref": "Role"}, "-pg"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Ref":"Role" }
+        } 
+		]
+      }
+    },
+    "RedshiftClusterSubnetGroup" : {
+      "Type" : "AWS::Redshift::ClusterSubnetGroup",
+      "Properties" : {
+        "Description" : "Cluster subnet group",
+        "SubnetIds" : [ { "Fn::FindInMap" : [ "SubnetsForGroup", {"Ref":"Environment"}, "subnet1" ] }, { "Fn::FindInMap" : [ "SubnetsForGroup", {"Ref":"Environment"}, "subnet2" ] } ],
+        "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"},"-redshift-", { "Ref": "Role"}, "-subnetgroup"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Ref":"Role" }
+        } 
+		]
+  	  }
+    },
+    "SecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security group",
+        "VpcId" : { "Fn::FindInMap" : [ "SubnetsForGroup", "vpc", {"Ref":"Environment"} ] },
+	    "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"},"-redshift-", { "Ref": "Role"}, "-sg"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Ref":"Role" }
+        } ]
+      }
+    }
+    },
+    "Outputs" : {
+      "ClusterEndpoint" : {
+        "Description" : "Cluster endpoint",
+        "Value" : { "Fn::Join" : [ ":", [ { "Fn::GetAtt" : [ "RedshiftCluster", "Endpoint.Address" ] }, { "Fn::GetAtt" : [ "RedshiftCluster", "Endpoint.Port" ] } ] ] }
+      },
+      "ClusterName" : {
+        "Description" : "Name of cluster",
+        "Value" : { "Ref" : "RedshiftCluster" }
+      },
+      "ParameterGroupName" : {
+        "Description" : "Name of parameter group",
+        "Value" : { "Ref" : "RedshiftClusterParameterGroup" }
+      },
+      "RedshiftClusterSubnetGroupName" : {
+        "Description" : "Name of cluster subnet group",
+        "Value" : { "Ref" : "RedshiftClusterSubnetGroup" }
+      },
+      "RedshiftClusterSecurityGroupName" : {
+        "Description" : "Name of cluster security group",
+        "Value" : { "Ref" : "SecurityGroup" }
+      }
+    }
+}   

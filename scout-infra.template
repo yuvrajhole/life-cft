@@ -1,0 +1,671 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Provision Scout Infra",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [ {
+          "Label": {
+              "default": "Tag Specifications"
+            },
+          "Parameters": [
+            "Environment",
+            "BillingCode",
+            "Owner",
+            "Role"
+          ]
+        },
+		{
+		  "Label": {
+              "default": "Scout Frontend Instance Specifications"
+            },
+          "Parameters": [
+            "PrivateScoutFE",
+            "ScoutFEImageId",
+			"ScoutFEInstanceType",
+			"ScoutFERootVolumeSize"
+            ]
+        },
+		{
+		  "Label": {
+              "default": "Scout Backend Instance Specifications"
+            },
+          "Parameters": [
+            "PrivateScoutBE",
+            "ScoutBEImageId",
+			"ScoutBEInstanceType",
+			"ScoutBERootVolumeSize",
+			"ScoutBEDataVolumeSize"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "PrivateScoutFE": {
+          "default": "ScoutFE Subnet : "
+        },
+        "ScoutFEImageId": {
+          "default": "ScoutFE Image Id : "
+        },
+		"PrivateScoutBE": {
+          "default": "ScoutBE Subnet : "
+        },
+        "ScoutBEImageId": {
+          "default": "ScoutBE Image Id : "
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "KeyName": {
+      "Description": "Name of the existing keypair to enable SSH access to EC2 instance.",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "Default": "atom-dev-dedup",
+      "MinLength": 1
+    },
+    "Environment": {
+      "Description": "Enter environment name",
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "prod"],
+      "ConstraintDescription":"Enter only allowed values.",
+      "MinLength":"1"
+    },
+    "BillingCode": {
+      "Description": "Enter BillingCode",
+      "Type": "String",
+      "Default": "atom",
+      "ConstraintDescription":"Enter BillingCode",
+      "MinLength":"1"
+    },
+    "Owner": {
+      "Description": "Enter owner name",
+      "Type": "String",
+      "ConstraintDescription":"Enter owner name proper.",
+      "MinLength":"1"
+    },
+    "PrivateScoutFE":{
+      "Description": "Select subnet for ScoutFE instance",
+      "Type": "AWS::EC2::Subnet::Id",
+      "ConstraintDescription":"Select one subnet for ScoutFE",
+      "MinLength":"1"
+    },
+    "ScoutFEImageId":{
+      "Description": "Enter Ami Id for ScoutFE",
+      "Type": "String",
+	  "Default" : "ami-0efab061",
+      "ConstraintDescription":"Enter Valid AMI Id",
+      "MinLength":"1",
+      "AllowedPattern": "[a-z0-9-]+"
+    },
+    "ScoutFERootVolumeSize" : {
+      "Description" : "The size of root volume must be greater than 8",
+      "Type" : "Number",
+      "Default" : "8"
+    },
+	"ScoutBERootVolumeSize" : {
+      "Description" : "The size of root volume must be greater than 8",
+      "Type" : "Number",
+      "Default" : "8"
+    },
+	"ScoutBEDataVolumeSize" : {
+      "Description" : "The size of root volume must be greater than 8",
+      "Type" : "Number",
+      "Default" : "8"
+    },
+    "ScoutBEInstanceType" : {
+      "Description" : "The type of node to be provisioned",
+      "Type" : "String",
+      "Default" : "t2.micro",
+      "AllowedValues" : [ 
+	    "t2.micro",
+        "t2.small",
+		"t2.medium",
+		"t2.large",
+		"t2.xlarge",
+        "t2.2xlarge",
+        "m4.large",
+        "m4.xlarge",
+        "m4.2xlarge",
+        "m4.4xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "r4.large",
+        "r4.xlarge",
+        "r4.2xlarge",
+        "r4.4xlarge" 
+	    ]
+    },
+	"ScoutFEInstanceType" : {
+      "Description" : "The type of node to be provisioned",
+      "Type" : "String",
+      "Default" : "t2.micro",
+      "AllowedValues" : [ 
+	    "t2.micro",
+        "t2.small",
+		"t2.medium",
+		"t2.large",
+		"t2.xlarge",
+        "t2.2xlarge",
+        "m4.large",
+        "m4.xlarge",
+        "m4.2xlarge",
+        "m4.4xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "r4.large",
+        "r4.xlarge",
+        "r4.2xlarge",
+        "r4.4xlarge" 
+	    ]
+    },
+	"PrivateScoutBE":{
+      "Description": "Select subnet for ScoutBE instance",
+      "Type": "AWS::EC2::Subnet::Id",
+      "ConstraintDescription":"Select one subnet for ScoutBE",
+      "MinLength":"1"
+    },
+    "ScoutBEImageId":{
+      "Description": "Enter Ami Id for ScoutBE",
+      "Type": "String",
+	  "Default" : "ami-ff97dc90",
+      "ConstraintDescription":"Enter Valid AMI Id",
+      "MinLength":"1",
+      "AllowedPattern": "[a-z0-9-]+"
+    },
+	"CertificateArn1": {
+	  "Description": "Enter cert ARN for ALB",
+      "Type": "String",
+	  "Default" : "arn:aws:acm:ap-south-1:039561965667:certificate/2f4582ea-99da-41d1-bfb5-29545324d05f"
+    },
+    "CertificateArn2": {
+	  "Description": "Enter cert ARN for ALB",
+      "Type": "String",
+	  "Default" : "arn:aws:acm:ap-south-1:039561965667:certificate/46250e4f-cfbc-4a18-ae8e-1a66a1062470"
+    }
+  },
+  "Mappings":{
+    "VpcForSG":{
+      "prod" : {"subnet1":"subnet-ff4a1196", "subnet2":"subnet-0dcc5f40"},
+      "dev" : {"subnet1":"subnet-18792671", "subnet2":"subnet-4cd44201"},
+  	  "vpc" : {"dev":"vpc-51550538", "prod":"vpc-d81548b1"}
+  	}
+  },
+  "Resources" : {
+    "ScoutFEInstance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId": {"Ref":"ScoutFEImageId"},
+        "KeyName": {"Ref":"KeyName"},
+		"BlockDeviceMappings" : [
+          {
+             "DeviceName" : "/dev/xvda",
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutFERootVolumeSize"} }
+          }],
+        "Tags" : [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-frontend" ] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": "ScoutFE"
+        } ],
+        "SubnetId" :{"Ref":"PrivateScoutFE"},
+        "InstanceType" :{ "Ref":"ScoutFEInstanceType" },
+        "SecurityGroupIds":[{"Ref":"ScoutFESecurityGroup"}]
+      }
+    },
+	"ScoutFETargetGroup" : {
+      "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties" : {
+      "HealthCheckIntervalSeconds": 30,
+      "HealthCheckProtocol": "HTTP",
+      "HealthCheckTimeoutSeconds": 5,
+      "HealthyThresholdCount": 4,
+      "Matcher" : {
+      "HttpCode" : "301"
+      },
+      "Name": { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-frontend-tg" ] ] },
+      "Port": 80,
+      "Protocol": "HTTP",
+      "TargetGroupAttributes": [{
+      "Key": "deregistration_delay.timeout_seconds",
+      "Value": "60"
+      }],
+      "Targets": [
+      { "Id": {"Ref" : "ScoutFEInstance"}, "Port": 80 }
+      ],
+      "UnhealthyThresholdCount": 3,
+      "VpcId": { "Fn::FindInMap" : [ "VpcForSG", "vpc", {"Ref":"Environment"} ] },
+      "Tags": [ {
+        "Key": "Name",
+        "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-frontend-tg"] ] }
+         } , {
+        "Key": "Environment",
+        "Value": { "Ref":"Environment" }
+        } , {
+        "Key": "BillingCode",
+        "Value": { "Ref":"BillingCode" }
+        } , {
+        "Key": "Owner",
+        "Value": { "Ref":"Owner" }
+        } , {
+        "Key": "Role",
+        "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-frontend-tg"] ] }
+        } 
+	    ]
+       }
+    },
+	"ScoutBETargetGroup" : {
+      "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties" : {
+      "HealthCheckIntervalSeconds": 30,
+      "HealthCheckProtocol": "HTTP",
+      "HealthCheckTimeoutSeconds": 5,
+      "HealthyThresholdCount": 4,
+      "Matcher" : {
+      "HttpCode" : "200"
+      },
+      "Name": { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-backend-tg" ] ] },
+      "Port": 3000,
+      "Protocol": "HTTP",
+      "TargetGroupAttributes": [{
+      "Key": "deregistration_delay.timeout_seconds",
+      "Value": "60"
+      }],
+      "Targets": [
+      { "Id": {"Ref" : "ScoutBEInstance"}, "Port": 3000 }
+      ],
+      "UnhealthyThresholdCount": 3,
+      "VpcId": { "Fn::FindInMap" : [ "VpcForSG", "vpc", {"Ref":"Environment"} ] },
+      "Tags": [ {
+        "Key": "Name",
+        "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-backend-tg"] ] }
+         } , {
+        "Key": "Environment",
+        "Value": { "Ref":"Environment" }
+        } , {
+        "Key": "BillingCode",
+        "Value": { "Ref":"BillingCode" }
+        } , {
+        "Key": "Owner",
+        "Value": { "Ref":"Owner" }
+        } , {
+        "Key": "Role",
+        "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-backend-tg"] ] }
+        } 
+	    ]
+       }
+    },
+	"ScoutBEInstance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId": {"Ref":"ScoutBEImageId"},
+        "KeyName": {"Ref":"KeyName"},
+		"BlockDeviceMappings" : [
+          {
+             "DeviceName" : "/dev/xvda",
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBERootVolumeSize"} }
+          },
+          {
+             "DeviceName" : "/dev/sdb",
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBEDataVolumeSize"} }
+          }],   
+        "Tags" : [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-backend" ] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": "ScoutBE"
+        } ],
+        "SubnetId" :{"Ref":"PrivateScoutBE"},
+		"UserData": { "Fn::Base64" : { "Fn::Join" : ["", ["#!/bin/bash", "\n", "xfs_growfs -d /dev/xvdb"]]}},
+        "InstanceType" :{ "Ref":"ScoutBEInstanceType" },
+        "SecurityGroupIds":[{"Ref":"ScoutBESecurityGroup"}]
+      }
+    },
+	"ScoutFESecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security group For Scout FE",
+		"GroupName" : { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-fe", "-sg"] ] },
+        "VpcId" : { "Fn::FindInMap" : [ "VpcForSG", "vpc", {"Ref":"Environment"} ] },
+		"SecurityGroupIngress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : "22",
+          "ToPort" : "22",
+          "CidrIp" : "14.143.19.162/32"
+        }],
+	    "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-fe", "-sg"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-be", "-sg"] ] }
+        } ]
+      }
+    },
+	"ScoutALBSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security group For Scout ALB",
+		"GroupName" : { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-alb", "-sg"] ] },
+        "VpcId" : { "Fn::FindInMap" : [ "VpcForSG", "vpc", {"Ref":"Environment"} ] },
+		"SecurityGroupIngress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : "80",
+          "ToPort" : "80",
+          "CidrIp" : "0.0.0.0/0"
+        }],
+        "SecurityGroupEgress" : [{
+          "IpProtocol" : "-1",
+          "CidrIp" : "0.0.0.0/0"
+        }],
+		"SecurityGroupIngress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : "443",
+          "ToPort" : "443",
+          "CidrIp" : "0.0.0.0/0"
+        }],
+	    "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-alb", "-sg"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-alb", "-sg"] ] }
+        } ]
+      }
+    },
+	"ScoutBESecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security group For Scout BE",
+		"GroupName" : { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-be", "-sg"] ] },
+        "VpcId" : { "Fn::FindInMap" : [ "VpcForSG", "vpc", {"Ref":"Environment"} ] },
+        "SecurityGroupEgress" : [{
+          "IpProtocol" : "-1",
+          "CidrIp" : "0.0.0.0/0"
+        }],
+	    "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-be", "-sg"] ] }
+        } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+        } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+        } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+        } , {
+          "Key": "Role",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "-be", "-sg"] ] }
+        } ]
+      }
+    },
+	"ScoutFESecurityGroupIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": { "Fn::GetAtt" : [ "ScoutFESecurityGroup", "GroupId" ] },
+    	"Description": "port 80 open for alb",
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "SourceSecurityGroupId": { "Fn::GetAtt" : [ "ScoutALBSecurityGroup", "GroupId" ] }
+      }
+    },
+    "ScoutBEAPISecurityGroupIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": { "Fn::GetAtt" : [ "ScoutBESecurityGroup", "GroupId" ] },
+    	"Description": "port 3000 open for alb",
+        "IpProtocol": "tcp",
+        "FromPort": "3000",
+        "ToPort": "3000",
+        "SourceSecurityGroupId": { "Fn::GetAtt" : [ "ScoutALBSecurityGroup", "GroupId" ] }
+      }
+    },
+    "ScoutBESecurityGroupIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": { "Fn::GetAtt" : [ "ScoutBESecurityGroup", "GroupId" ] },
+    	"Description": "port 22 open for fe",
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "SourceSecurityGroupId": { "Fn::GetAtt" : [ "ScoutFESecurityGroup", "GroupId" ] }
+      }
+    },
+	"ScoutEIP" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "ScoutFEInstance" }
+      }
+    },
+    "ScoutloadBalancer" : {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Scheme" : "internet-facing",
+		"Name" : { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "alb"] ] },
+        "Subnets" : [ { "Fn::FindInMap" : [ "VpcForSG", {"Ref":"Environment"}, "subnet1" ] }, { "Fn::FindInMap" : [ "VpcForSG", {"Ref":"Environment"}, "subnet2" ] }],
+        "LoadBalancerAttributes" : [
+          { "Key" : "idle_timeout.timeout_seconds", "Value" : "60" },
+    	  { "Key" : "access_logs.s3.enabled", "Value" : "true" },
+    	  { "Key" : "access_logs.s3.bucket", "Value" : { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-alb-logs" ] ] } },
+    	  { "Key" : "access_logs.s3.prefix", "Value" : { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-alb-logs" ] ] } },
+    	  { "Key" : "deletion_protection.enabled", "Value" : "false" }
+        ],
+        "SecurityGroups": [{"Ref": "ScoutALBSecurityGroup"}],
+    	"Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "alb"] ] }
+          } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+          } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+          } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+          } , {
+          "Key": "Role",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout", "alb"] ] }
+        } ]
+      }
+	},
+    "ScoutALBListener": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+            {
+                "Type": "forward",
+                "TargetGroupArn": {
+                    "Ref": "ScoutFETargetGroup"
+                }
+            }
+        ],
+        "LoadBalancerArn": {
+            "Ref": "ScoutloadBalancer"
+        },
+        "Port": "443",
+        "Protocol": "HTTPS",
+    	"SslPolicy" : "ELBSecurityPolicy-TLS-1-2-2017-01",
+        "Certificates": [
+            {
+                "CertificateArn": {
+                    "Ref": "CertificateArn1"
+                }
+            }
+        ]
+      }
+    },
+    "ListenerCertificate": {
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerCertificate",
+      "Properties": {
+          "Certificates": [
+              {
+                  "CertificateArn": {
+                      "Ref": "CertificateArn2"
+                  }
+              }
+          ],
+          "ListenerArn": {
+              "Ref": "ScoutALBListener"
+          }
+      }
+    },
+	"ScoutAPPListenerRule": {
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+      "Properties": {
+        "Actions": [{
+          "Type": "forward",
+          "TargetGroupArn": { "Ref": "ScoutFETargetGroup" }
+        }],
+        "Conditions": [{
+          "Field": "host-header",
+          "Values": [ "*.apps-hdfclife.com" ]
+        }],
+        "ListenerArn": { "Ref": "ScoutALBListener" },
+        "Priority": 1
+      }
+    },
+    "ScoutAPIListenerRule": {
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+      "Properties": {
+        "Actions": [{
+          "Type": "forward",
+          "TargetGroupArn": { "Ref": "ScoutBETargetGroup" }
+        }],
+        "Conditions": [{
+          "Field": "host-header",
+          "Values": [ "*.api-hdfclife.com" ]
+        }],
+        "ListenerArn": { "Ref": "ScoutALBListener" },
+        "Priority": 2
+      }
+    },
+    "loadBalancerlogbucket" : {
+      "Type" : "AWS::S3::Bucket",
+      "Properties" : {
+        "AccessControl" : "LogDeliveryWrite",
+        "BucketName" : { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-alb-logs" ] ] } ,
+        "Tags": [ {
+          "Key": "Name",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-alb-logs"] ] }
+          } , {
+          "Key": "Environment",
+          "Value": { "Ref":"Environment" }
+          } , {
+          "Key": "BillingCode",
+          "Value": { "Ref":"BillingCode" }
+          } , {
+          "Key": "Owner",
+          "Value": { "Ref":"Owner" }
+          } , {
+          "Key": "Role",
+          "Value": { "Fn::Join": [ "",[ "atom-", { "Ref": "Environment"}, "-scout-alb-logs"] ] }
+        } ]
+      }
+	},
+    "loadBalancerlogbucketpolicy" : {
+      "Type" : "AWS::S3::BucketPolicy",
+      "Properties" : {
+        "Bucket" : { "Fn::Join": [ "", [ "atom-",{"Ref": "Environment"}, "-scout-alb-logs" ] ] },
+        "PolicyDocument" : {
+		  "Version": "2012-10-17",
+          "Id": "Policy480833364711",
+          "Statement": [
+		        {
+                 "Action":"s3:PutObject",
+                 "Effect":"Allow",
+                 "Principal": { "AWS": "arn:aws:iam::718504428378:root" },
+                 "Resource": { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "loadBalancerlogbucket" } , "/*" ]]},
+                 "Sid":"Stmt565960631791"
+                }
+		    ]
+        }
+	  }
+    }
+  },
+  "Outputs" : {
+    "ScoutFEInstanceId" : {
+      "Description" : "Scout FE Instance DNS",
+      "Value" : { "Fn::GetAtt" : [ "ScoutFEInstance", "PrivateDnsName" ] }
+    },
+    "ScoutBEInstanceId" : {
+      "Description" : "Scout BE Instance DNS",
+      "Value" : { "Fn::GetAtt" : [ "ScoutBEInstance", "PrivateDnsName" ] }
+    },
+    "ScoutFESecurityGroupName" : {
+      "Description" : "Name of BE security group",
+      "Value" : { "Ref" : "ScoutFESecurityGroup" }
+    },
+    "ScoutBESecurityGroupName" : {
+      "Description" : "Name of BE security group",
+      "Value" : { "Ref" : "ScoutBESecurityGroup" }
+    },
+	"ScoutALBSecurityGroupName" : {
+      "Description" : "Name of ALB security group",
+      "Value" : { "Ref" : "ScoutALBSecurityGroup" }
+    },
+	"ScoutFETargetGroupName" : {
+      "Description" : "Name of FE Target group",
+      "Value" : { "Fn::GetAtt" : [ "ScoutFETargetGroup", "TargetGroupName" ] }
+    },
+	"ScoutBETargetGroupName" : {
+      "Description" : "Name of BE Target group",
+      "Value" : { "Fn::GetAtt" : [ "ScoutBETargetGroup", "TargetGroupName" ] }
+    },
+	"loadBalancerlogbucketName" : {
+      "Description" : "Name of ALB Log Bucket",
+      "Value" : { "Ref" : "loadBalancerlogbucket" }
+    },
+	"ScoutloadBalancerName" : {
+      "Description" : "Name of ALB",
+      "Value" : { "Ref" : "ScoutloadBalancer" }
+    },
+	"ScoutEIP" : {
+      "Description" : "Scout FE EIP",
+      "Value" : { "Ref" : "ScoutEIP" }
+    }
+  }
+}
