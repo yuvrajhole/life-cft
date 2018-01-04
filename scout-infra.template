@@ -202,7 +202,9 @@
 		"BlockDeviceMappings" : [
           {
              "DeviceName" : "/dev/xvda",
-             "Ebs" : { "VolumeSize" : {"Ref":"ScoutFERootVolumeSize"} }
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutFERootVolumeSize"},
+                       "VolumeType":"gp2" 
+					}
           }],
         "Tags" : [ {
           "Key": "Name",
@@ -315,11 +317,15 @@
 		"BlockDeviceMappings" : [
           {
              "DeviceName" : "/dev/xvda",
-             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBERootVolumeSize"} }
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBERootVolumeSize"},
+                       "VolumeType":"gp2" 
+             	    }
           },
           {
              "DeviceName" : "/dev/sdb",
-             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBEDataVolumeSize"} }
+             "Ebs" : { "VolumeSize" : {"Ref":"ScoutBEDataVolumeSize"},
+                       "VolumeType":"gp2" 
+         			}
           }],   
         "Tags" : [ {
           "Key": "Name",
